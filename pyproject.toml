@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tether-telemetry-integrity"
+version = "1.0.0"
+description = "A lightweight ML-assisted telemetry integrity gate for motorsport-style time series."
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "TETHER contributors"}]
+dependencies = [
+  "numpy>=1.26,<3.0",
+  "pandas>=2.1,<3.0",
+  "scikit-learn>=1.4,<2.0",
+  "streamlit>=1.54,<2.0",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint.per-file-ignores]
+"app.py" = ["E402"]
+"scripts/*.py" = ["E402"]

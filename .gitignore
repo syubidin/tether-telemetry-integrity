@@ -1,0 +1,16 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.DS_Store
+Thumbs.db
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+portfolio_case_study.md
