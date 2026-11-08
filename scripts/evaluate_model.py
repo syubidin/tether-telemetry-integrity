@@ -1,7 +1,7 @@
 """Reproducible hold-out evaluation for the synthetic training distribution."""
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
@@ -9,8 +9,8 @@ sys.path.insert(0, str(ROOT / "src"))
 from sklearn.metrics import accuracy_score, classification_report
 from sklearn.model_selection import train_test_split
 
-from tether.model import make_training_data
 from tether.features import FEATURE_NAMES
+from tether.model import make_training_data
 
 
 def main() -> None:

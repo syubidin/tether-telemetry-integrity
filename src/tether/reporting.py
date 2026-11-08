@@ -10,7 +10,7 @@ def summarize_results(results: pd.DataFrame) -> dict[str, int]:
         return {"sensors": 0, "windows": 0, "alerts": 0, "healthy": 0, "review": 0}
     return {
         "sensors": int(results["sensor"].nunique()),
-        "windows": int(len(results)),
+        "windows": len(results),
         "alerts": int((results["status"] == "ALERT").sum()),
         "healthy": int((results["status"] == "HEALTHY").sum()),
         "review": int((results["status"] == "REVIEW").sum()),

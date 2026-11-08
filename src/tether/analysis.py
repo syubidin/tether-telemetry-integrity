@@ -13,6 +13,21 @@ from tether.validation import validate_sensor_selection
 WINDOW_SIZE = 64
 MIN_WINDOW_SIZE = 32
 
+RESULT_COLUMNS = [
+    "sensor",
+    "window",
+    "start_row",
+    "end_row",
+    "fault_type",
+    "status",
+    "severity",
+    "model_score_pct",
+    "method",
+    "missing_pct",
+    "range_violations",
+    "recommended_check",
+]
+
 KNOWN_RANGES: dict[str, tuple[float, float, str]] = {
     "speed_kph": (0.0, 380.0, "km/h"),
     "throttle_pct": (0.0, 100.0, "%"),
@@ -160,4 +175,4 @@ def analyze_dataframe(
 
     if not records:
         warnings.append("No windows could be analyzed. Each selected sensor needs at least 32 rows.")
-    return pd.DataFrame(records), warnings
+    return pd.DataFrame(records, columns=RESULT_COLUMNS), warnings

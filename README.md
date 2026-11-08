@@ -7,9 +7,15 @@
 
 A lightweight, ML-assisted telemetry integrity gate for motorsport-style time-series data.
 
+**[🚀 Launch Live Demo](https://tether-telemetry-integrity.streamlit.app/)**
+
 `PYTHON` · `SCIKIT-LEARN` · `PANDAS` · `STREAMLIT` · `CPU-FIRST`
 
 </div>
+
+---
+
+> **Live Application:** Access the live interactive dashboard directly at [https://tether-telemetry-integrity.streamlit.app/](https://tether-telemetry-integrity.streamlit.app/) without needing local installation.
 
 ---
 
@@ -27,18 +33,20 @@ A misleading signal can create wasted investigation, false alarms, or poor engin
 
 > TETHER is an independent educational prototype. All bundled telemetry is synthetic.
 
+---
+
 ## What it does
 
 | Capability | Behaviour |
 |---|---|
-| CSV intake | Validates UTF-8 CSV shape, headers, size, row count and column count |
-| Window analysis | Breaks continuous channels into 64-sample windows |
-| Feature extraction | Computes robust statistics, missingness, flatline, trend and derivative features |
-| ML classification | A compact Random Forest classifies six signal patterns |
-| Integrity rules | Catches high-signal dropout and stuck-at conditions deterministically |
-| Triage | Separates `HEALTHY`, `ALERT` and `REVIEW` findings |
-| Engineering guidance | Suggests the next measurement or acquisition checks to investigate |
-| Demo data | Provides clean and fault-injected synthetic lap-like CSV files |
+| **CSV intake** | Validates UTF-8 CSV shape, headers, size, row count and column count |
+| **Window analysis** | Breaks continuous channels into 64-sample windows |
+| **Feature extraction** | Computes robust statistics, missingness, flatline, trend and derivative features |
+| **ML classification** | A compact Random Forest classifies six signal patterns |
+| **Integrity rules** | Catches high-signal dropout and stuck-at conditions deterministically |
+| **Triage** | Separates `HEALTHY`, `ALERT` and `REVIEW` findings |
+| **Engineering guidance** | Suggests the next measurement or acquisition checks to investigate |
+| **Demo data** | Provides clean and fault-injected synthetic lap-like CSV files |
 
 ### Fault classes
 
@@ -53,17 +61,22 @@ A misleading signal can create wasted investigation, false alarms, or poor engin
 
 A model score is the winning Random Forest class score. It is **not a calibrated probability**, a vehicle safety score, or proof of a mechanical fault. Deterministic rules are identified by `method = RULE`; their model-score cell is left blank.
 
+---
+
 ## See it in action
 
-Run locally and select **Fault-injected synthetic lap**. The example includes:
+You can test the project immediately via the [Live Demo](https://tether-telemetry-integrity.streamlit.app/) or run it locally:
 
-1. A gradual coolant-temperature trend (review candidate, not an automatic fault verdict).
-2. A pressure channel frozen at one value (`STUCK`).
-3. Isolated throttle discontinuities (`SPIKE`).
-4. Missing RPM samples (`DROPOUT`).
-5. A noisy speed segment (`NOISE`).
+1. Select **Fault-injected synthetic lap** to inspect deliberate fault signatures:
+   - A gradual coolant-temperature trend (review candidate, not an automatic fault verdict).
+   - A pressure channel frozen at one value (`STUCK`).
+   - Isolated throttle discontinuities (`SPIKE`).
+   - Missing RPM samples (`DROPOUT`).
+   - A noisy speed segment (`NOISE`).
+2. Select **Clean synthetic lap** to compare the baseline. The regression tests require the clean demo to produce no escalated alerts and the injected demo to expose dropout, stuck, spike and noise signatures.
+3. Select **Upload a CSV** to inspect your own comma-delimited numeric telemetry.
 
-Select **Clean synthetic lap** to compare the baseline. The regression tests require the clean demo to produce no escalated alerts and the injected demo to expose dropout, stuck, spike and noise signatures.
+---
 
 ## Architecture
 
@@ -92,9 +105,11 @@ src/tether/analysis.py         Rules, batched inference and triage
 src/tether/synthetic.py        Reproducible demo data generator
 src/tether/reporting.py        Summary counters
 scripts/                       Data generation and model evaluation
- tests/                        Unit and integration tests
- docs/                         Architecture, decisions and deployment
+tests/                         Unit and integration tests
+docs/                          Architecture, decisions and deployment
 ```
+
+---
 
 ## Quick start
 
@@ -140,6 +155,8 @@ Regenerate the bundled examples with:
 python scripts/generate_demo_data.py
 ```
 
+---
+
 ## CSV contract
 
 - File type: UTF-8 CSV, comma-delimited.
@@ -164,6 +181,8 @@ time_s,speed_kph,throttle_pct,brake_pct,rpm,coolant_temp_c,oil_pressure_bar
 
 Known physical ranges are advisory checks for a small set of recognised channel names. They are not universal vehicle limits and do not alter the ML prediction.
 
+---
+
 ## Low-end device and performance choices
 
 - No GPU, deep-learning runtime, database, message broker or external API is required.
@@ -172,6 +191,8 @@ Known physical ranges are advisory checks for a small set of recognised channel 
 - Inference is batched across all windows rather than called once per individual window.
 - Upload, row and column limits bound the memory footprint.
 - The UI plots no more than the first 2,000 samples of the selected channel.
+
+---
 
 ## Security and privacy
 
@@ -186,19 +207,23 @@ For a real engineering deployment, add authentication, role-based access, encryp
 
 See [SECURITY.md](SECURITY.md) and [docs/engineering_decisions.md](docs/engineering_decisions.md).
 
+---
+
 ## Model evaluation
 
 A reproducible 25% hold-out split from the synthetic generator (330 windows; 55 examples per class) currently reports:
 
 | Metric | Result |
 |---|---:|
-| Accuracy | **94.8%** |
-| Macro precision | 95.3% |
-| Macro recall | 94.8% |
-| Macro F1 | **94.8%** |
+| **Accuracy** | **94.5%** |
+| Macro precision | 94.9% |
+| Macro recall | 94.5% |
+| **Macro F1** | **94.5%** |
 | Normal recall | 78.2% |
 
 The weaker `NORMAL` recall is intentionally visible rather than hidden. A conservative review state is preferable to claiming confidence where a signal pattern is ambiguous. These figures measure only the synthetic generator and must not be interpreted as real-world or F1-grade performance. See the reproducible script at `scripts/evaluate_model.py`.
+
+---
 
 ## Next engineering steps
 
@@ -207,6 +232,8 @@ The weaker `NORMAL` recall is intentionally visible rather than hidden. A conser
 3. Add timestamp-gap and packet-sequence diagnostics.
 4. Validate on appropriately licensed public motorsport/vehicle datasets and report per-fault precision/recall, false alerts per hour and detection delay.
 5. Add a versioned model/data contract, CI security scanning, monitoring and an authenticated ingestion API if the system moves beyond a prototype.
+
+---
 
 ## License
 
