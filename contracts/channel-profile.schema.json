@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tether.example/contracts/channel-profile-1.0.0.schema.json",
+  "title": "TETHER channel profile",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "profile_id", "version", "sample_rate_hz", "timestamp_column", "sequence_column", "channels", "relationships"],
+  "properties": {
+    "schema_version": {"const": "1.0.0"},
+    "profile_id": {"type": "string", "minLength": 1, "maxLength": 80},
+    "version": {"type": "string", "minLength": 1, "maxLength": 40},
+    "sample_rate_hz": {"type": "number", "exclusiveMinimum": 0},
+    "timestamp_column": {"type": "string", "maxLength": 64},
+    "sequence_column": {"type": "string", "maxLength": 64},
+    "channels": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 40,
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"},
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["unit", "minimum", "maximum", "sample_rate_hz"],
+        "properties": {
+          "unit": {"type": "string", "maxLength": 32},
+          "minimum": {"type": "number"},
+          "maximum": {"type": "number"},
+          "sample_rate_hz": {"type": "number", "exclusiveMinimum": 0}
+        }
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "maxItems": 40,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "kind", "x", "y"],
+        "properties": {
+          "name": {"type": "string", "minLength": 1, "maxLength": 80},
+          "kind": {"enum": ["linear", "kinematic"]},
+          "x": {"type": "string"},
+          "y": {"type": "string"},
+          "condition_by": {"type": ["string", "null"]},
+          "residual_z_threshold": {"type": "number", "exclusiveMinimum": 0},
+          "min_samples": {"type": "integer", "minimum": 8, "maximum": 100000},
+          "max_lag_samples": {"type": "integer", "minimum": 0, "maximum": 8}
+        }
+      }
+    }
+  }
+}

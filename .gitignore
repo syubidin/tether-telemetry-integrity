@@ -13,4 +13,13 @@ Thumbs.db
 htmlcov/
 .mypy_cache/
 .ruff_cache/
-portfolio_case_study.md
+
+# Native build outputs and local datasets
+build/
+external_data/
+*.so
+*.dll
+*.dylib
+*.o
+*.a
+*.exe

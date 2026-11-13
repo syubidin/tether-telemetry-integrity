@@ -1,240 +1,253 @@
-<div align="center">
-
 # TETHER
+
 ### Telemetry Health & Event Reliability Engine
 
-**Trust the signal before trusting the decision.**
+> **Trust the signal before trusting the decision.**
 
-A lightweight, ML-assisted telemetry integrity gate for motorsport-style time-series data.
+TETHER is a lightweight, CPU-first telemetry integrity prototype. It combines a small machine-learning classifier with deterministic checks, trusted cross-sensor baselines, and bounded packet ingestion to identify when a measurement may no longer be reliable.
 
-**[🚀 Launch Live Demo](https://tether-telemetry-integrity.streamlit.app/)**
+It is designed as a software-engineering portfolio project in the motorsport / vehicle-data domain. It is **not** an official team tool, does not use private team telemetry, and is not affiliated with Mercedes-AMG PETRONAS or Formula 1.
 
-`PYTHON` · `SCIKIT-LEARN` · `PANDAS` · `STREAMLIT` · `CPU-FIRST`
-
-</div>
-
----
-
-> **Live Application:** Access the live interactive dashboard directly at [https://tether-telemetry-integrity.streamlit.app/](https://tether-telemetry-integrity.streamlit.app/) without needing local installation.
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![C++](https://img.shields.io/badge/C%2B%2B-17-00599C?logo=cplusplus&logoColor=white)
+![Tests](https://img.shields.io/badge/tests-32%20passing-brightgreen)
+![License](https://img.shields.io/badge/license-MIT-blue)
 
 ---
 
-## Why TETHER exists
+## The engineering problem
 
-Race engineering depends on trustworthy measurements. A sensor can quietly become unreliable long before a dashboard or downstream analysis makes the problem obvious:
+A downstream dashboard can only be as trustworthy as the signals it receives. Sensor dropouts, frozen values, drift, spikes, excess noise, timestamp discontinuities, and packet loss can lead engineers to investigate the wrong thing.
 
-- **Dropout** — samples or packets disappear.
-- **Stuck-at** — a channel keeps reporting the same value.
-- **Drift** — a reading gradually moves away from its expected baseline.
-- **Spike** — a sudden, isolated discontinuity appears.
-- **Noise** — high-frequency variation obscures the underlying signal.
+A second problem is **false positives**. Vehicle behaviour is coupled and changes constantly: RPM should vary with road speed and gear, speed derivative should broadly agree with longitudinal acceleration, but throttle and speed are not expected to follow one fixed line. A simple threshold can mistake legitimate vehicle dynamics for a sensor fault.
 
-A misleading signal can create wasted investigation, false alarms, or poor engineering decisions. TETHER is a small inspection layer intended to sit before downstream analytics. It asks a simple question: *is this channel trustworthy enough to use?*
+TETHER therefore uses two layers:
 
-> TETHER is an independent educational prototype. All bundled telemetry is synthetic.
+1. **Signal-local screening** — a compact Random Forest plus deterministic dropout / flatline rules. Non-normal ML predictions remain review-only because the scores are not calibrated.
+2. **Cross-sensor integrity checks** — compare a channel against a trusted, vehicle-specific relationship baseline. A non-normal ML candidate can be de-escalated only when its configured relationship is healthy; missing evidence never suppresses it.
 
----
+Only deterministic dropout / stuck rules currently create a hard `ALERT`. Drift, spike, noise and uncertain ML findings stay in `REVIEW` unless cross-sensor evidence reduces the suspicion.
 
-## What it does
+## What is in v1.1.0
 
-| Capability | Behaviour |
+| Capability | Implementation |
 |---|---|
-| **CSV intake** | Validates UTF-8 CSV shape, headers, size, row count and column count |
-| **Window analysis** | Breaks continuous channels into 64-sample windows |
-| **Feature extraction** | Computes robust statistics, missingness, flatline, trend and derivative features |
-| **ML classification** | A compact Random Forest classifies six signal patterns |
-| **Integrity rules** | Catches high-signal dropout and stuck-at conditions deterministically |
-| **Triage** | Separates `HEALTHY`, `ALERT` and `REVIEW` findings |
-| **Engineering guidance** | Suggests the next measurement or acquisition checks to investigate |
-| **Demo data** | Provides clean and fault-injected synthetic lap-like CSV files |
-
-### Fault classes
-
-| Class | Interpretation | Default handling |
-|---|---|---|
-| `NORMAL` | No strong integrity issue detected | Healthy when model score is at least 55%; otherwise review |
-| `DROPOUT` | At least 20% of a window is missing/non-finite | Rule-based alert |
-| `STUCK` | A long flatline with very low value diversity | Rule-based alert |
-| `DRIFT` | The window resembles an unusual sustained trend | **Review only**; a trend alone does not prove sensor drift |
-| `SPIKE` | Isolated discontinuity in the first difference | ML alert when score is at least 55% |
-| `NOISE` | High-frequency variation relative to the signal | ML alert when score is at least 55% |
-
-A model score is the winning Random Forest class score. It is **not a calibrated probability**, a vehicle safety score, or proof of a mechanical fault. Deterministic rules are identified by `method = RULE`; their model-score cell is left blank.
-
----
-
-## See it in action
-
-You can test the project immediately via the [Live Demo](https://tether-telemetry-integrity.streamlit.app/) or run it locally:
-
-1. Select **Fault-injected synthetic lap** to inspect deliberate fault signatures:
-   - A gradual coolant-temperature trend (review candidate, not an automatic fault verdict).
-   - A pressure channel frozen at one value (`STUCK`).
-   - Isolated throttle discontinuities (`SPIKE`).
-   - Missing RPM samples (`DROPOUT`).
-   - A noisy speed segment (`NOISE`).
-2. Select **Clean synthetic lap** to compare the baseline. The regression tests require the clean demo to produce no escalated alerts and the injected demo to expose dropout, stuck, spike and noise signatures.
-3. Select **Upload a CSV** to inspect your own comma-delimited numeric telemetry.
-
----
-
-## Architecture
-
-```mermaid
-flowchart TD
-    A[CSV upload or synthetic demo] --> B[Bounded CSV validation]
-    B --> C[Numeric channel selection]
-    C --> D[64-sample windows]
-    D --> E[Robust feature extraction]
-    E --> F{Deterministic integrity rule?}
-    F -- Yes --> G[Rule finding]
-    F -- No --> H[Batch Random Forest inference]
-    G --> I[Finding and triage]
-    H --> I
-    I --> J[Streamlit dashboard]
-```
-
-The code is deliberately split by responsibility:
-
-```text
-app.py                         Streamlit UI and session flow
-src/tether/validation.py       CSV validation and sensor selection
-src/tether/features.py         Robust window feature extraction
-src/tether/model.py            Synthetic training data and Random Forest
-src/tether/analysis.py         Rules, batched inference and triage
-src/tether/synthetic.py        Reproducible demo data generator
-src/tether/reporting.py        Summary counters
-scripts/                       Data generation and model evaluation
-tests/                         Unit and integration tests
-docs/                          Architecture, decisions and deployment
-```
-
----
+| Lightweight ML | CPU-only Random Forest, bounded windows, batch inference |
+| Channel profiles | Versioned units, sample rate, operating envelopes, expected relationships |
+| Trusted baselines | Robust linear fit; RPM–speed fit conditioned on gear |
+| Cross-sensor residuals | RPM vs speed by gear; speed derivative vs longitudinal accelerometer, including small lag search |
+| Timing diagnostics | Timestamp gaps / regressions, duplicate and missing packet sequence checks |
+| Streaming | One-packet-at-a-time ingestion with a bounded in-memory window |
+| C++ | Optional C++17 speed/acceleration residual kernel via `ctypes`; NumPy fallback |
+| API | Optional FastAPI bearer-token ingestion endpoint, strict version contract and body/channel limits |
+| Monitoring | Packet counters, gap/reject counts, bounded p50/p95 ingest-latency snapshot |
+| Security / quality | Automated tests, Ruff, Bandit, pip-audit and Gitleaks in GitHub Actions |
+| Public data path | Bounded HDF-to-CSV adapter for an appropriately licensed public vehicle CAN dataset |
 
 ## Quick start
 
-**Requirements:** Python 3.11 recommended (3.10+ supported). The workload is CPU-first and does not require a GPU.
-
-### Windows PowerShell
-
-```powershell
-git clone https://github.com/syubidin/tether-telemetry-integrity.git
-cd tether-telemetry-integrity
-py -3.11 -m venv .venv
-.\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
-streamlit run app.py
-```
-
-### macOS / Linux
+Python 3.11 is recommended. Python 3.10+ is supported by the package configuration.
 
 ```bash
-git clone https://github.com/syubidin/tether-telemetry-integrity.git
-cd tether-telemetry-integrity
-python3.11 -m venv .venv
+# 1. Create and activate a virtual environment
+python -m venv .venv
+
+# Windows PowerShell
+.venv\Scripts\Activate.ps1
+
+# macOS / Linux
 source .venv/bin/activate
+
+# 2. Install the app and development dependencies
 python -m pip install --upgrade pip
-pip install -r requirements.txt
+pip install -r requirements-dev.txt
+
+# 3. Start the dashboard
 streamlit run app.py
 ```
 
-Open the local URL printed by Streamlit (normally `http://localhost:8501`).
+Open `http://localhost:8501`.
 
-### Run tests and evaluate the model
+### Dashboard walkthrough
+
+1. Select the **Generic track car · 20 Hz** profile for the bundled sample data.
+2. Run the clean and fault-injected synthetic laps.
+3. Open **Cross-sensor correlation** to review residuals against the trusted baseline.
+4. Open **Live packet replay** to replay packets incrementally and optionally simulate a sequence gap.
+5. For your own approved data, select **Upload a CSV**, choose the matching profile, and upload a *separate known-good baseline* from the same vehicle and sensor configuration.
+
+The **Vehicle CAN passenger car · 20 Hz** profile is intended for the public CAN dataset workflow below. The bundled generic synthetic CSV does not contain that profile's channels.
+
+## Example engineering findings
+
+The active demo profiles define these relationships:
+
+- `rpm_vs_speed_conditioned_on_gear`: estimates a separate RPM–speed relationship for each gear, rather than fitting one misleading line across all gears.
+- `speed_derivative_vs_accelerometer`: compares the time derivative of road speed (converted from km/h to m/s) with measured longitudinal acceleration. The trusted baseline can select a small sample lag to account for sensor alignment.
+
+Throttle and vehicle speed are deliberately **not** forced into a fixed linear relationship. Driver input, braking, gear changes, traction, and vehicle dynamics make that relationship context-dependent. Adding a simplistic throttle/speed line would likely create false positives.
+
+A high residual means "relationship changed; inspect this window", not "this component has failed". The UI intentionally keeps this state as `REVIEW`.
+
+## Real-time packet replay
+
+Replay the bundled CSV one packet at a time through a bounded buffer:
 
 ```bash
-pip install -r requirements-dev.txt
-pytest
+python scripts/replay_stream.py --limit 256
+```
+
+To send packets over the optional authenticated API, start it in another terminal:
+
+```bash
+# Install API dependencies (already included by requirements-dev.txt)
+pip install -r requirements-api.txt
+
+# macOS / Linux
+export TETHER_API_TOKEN="$(python -c 'import secrets; print(secrets.token_urlsafe(32))')"
+
+# Windows PowerShell
+$env:TETHER_API_TOKEN = (python -c "import secrets; print(secrets.token_urlsafe(32))")
+
+uvicorn tether.api:app --app-dir src --host 127.0.0.1 --port 8000
+```
+
+In a second terminal with the same environment variable:
+
+```bash
+python scripts/send_demo_stream.py --limit 128
+```
+
+Endpoints:
+
+| Endpoint | Access | Purpose |
+|---|---|---|
+| `GET /health` | Public | Liveness only; does not reveal internal counters |
+| `POST /v1/telemetry/packet` | Bearer token | Validate and ingest one packet |
+| `GET /v1/telemetry/metrics` | Bearer token | Read bounded packet / gap / latency counters |
+
+The API accepts telemetry contract `1.0.0`, only configured channel names, at most 40 channels, and request bodies up to 8 KiB. The processor rejects duplicates, out-of-order sequence numbers, timestamp regressions, non-finite measurements and invalid identifiers. Sequence and timestamp gaps are diagnosed without silently sorting or fabricating samples.
+
+## Optional C++17 kernel
+
+The core remains usable without a C++ compiler. Build the native acceleration residual function when CMake and a C++17 compiler are available:
+
+```bash
+cmake -S cpp -B build -DCMAKE_BUILD_TYPE=Release
+cmake --build build --config Release --parallel
+ctest --test-dir build --output-on-failure
+```
+
+The Python adapter discovers the shared library in `build/`. If it is missing or fails to load, TETHER uses the NumPy implementation instead. This keeps the default install portable and low-end friendly.
+
+Check native availability:
+
+```bash
+python -c "import sys; sys.path.insert(0, 'src'); from tether.native import native_available; print(native_available())"
+```
+
+## Reproducible evaluation
+
+Run the synthetic hold-out classifier evaluation:
+
+```bash
 python scripts/evaluate_model.py
 ```
 
-Regenerate the bundled examples with:
+Run a 30-minute synthetic clean-baseline + controlled fault-injection experiment:
 
 ```bash
-python scripts/generate_demo_data.py
+python scripts/evaluate_injected_faults.py
 ```
 
----
+The detailed report is written to `reports/injected_fault_metrics.json`. Current recorded 30-minute synthetic experiment (12-minute held-out evaluation segment):
 
-## CSV contract
+**Signal-local fault injection**
 
-- File type: UTF-8 CSV, comma-delimited.
-- Maximum upload: **5 MB**.
-- Maximum shape: **20,000 rows × 40 columns**.
-- Header names must be non-empty and unique (case-insensitive).
-- Every non-empty row must have the same number of fields as the header.
-- At least one mostly-numeric sensor channel is required.
-- Obvious time and index columns (`time_s`, `timestamp`, `lap_time`, `frame`, etc.) are not selected as sensor channels automatically.
-- Discrete state channels such as `gear`, `drs`, and `pit_limiter` are excluded from automatic selection because long plateaus can be normal for state signals.
-- Each selected channel needs at least 32 samples. A final short tail is merged into the previous window.
-- Non-finite values are treated as missing. Original row order is preserved; TETHER does not silently sort, interpolate, or resample data.
+| Fault | Channel | Precision | Recall | F1 | FP windows | Detection delay |
+|---|---|---:|---:|---:|---:|---:|
+| DROPOUT | `rpm` | 1.00 | 1.00 | 1.00 | 0 | 3.2 s |
+| STUCK | `oil_pressure_bar` | 1.00 | 1.00 | 1.00 | 0 | 3.2 s |
+| DRIFT | `coolant_temp_c` | 0.50 | 1.00 | 0.67 | 1 | 3.2 s |
+| SPIKE | `throttle_pct` | 1.00 | 1.00 | 1.00 | 0 | 3.2 s |
+| NOISE | `speed_kph` | 1.00 | 1.00 | 1.00 | 0 | 3.2 s |
 
-Example schema:
+**Cross-sensor residual fault injection**
 
-```csv
-time_s,speed_kph,throttle_pct,brake_pct,rpm,coolant_temp_c,oil_pressure_bar
-0.000,180.2,83.4,0.0,10850,92.1,4.3
-0.084,181.6,84.1,0.0,10910,92.1,4.3
-0.168,183.0,85.0,0.0,10980,92.2,4.2
+| Fault | Relationship | Precision | Recall | F1 | Detection delay |
+|---|---|---:|---:|---:|---:|
+| RPM drift (+500 rpm) | RPM vs speed, conditioned on gear | 1.00 | 1.00 | 1.00 | 3.2 s |
+| Accelerometer bias (+1.8 m/s²) | Speed derivative vs longitudinal acceleration | 1.00 | 1.00 | 1.00 | 3.2 s |
+
+**Clean-segment operational counts:** 0.0 hard `ALERT` events/hour, 0.0 cross-sensor `REVIEW` findings/hour, but **3,585 ML review candidates/hour** across all selected numeric channels. The last number is an important unresolved limitation: the synthetic ML model is not calibrated for a low-noise review queue, and the candidate volume is not production-acceptable. Cross-sensor evidence is currently available only for explicitly configured relationships; uncorroborated ML findings remain review-only rather than being silently discarded.
+
+Each fault scenario contains one positive 64-sample target window. Metrics are window-level, not sample-level; the 3.2-second delay is the completion time of a 64-sample window at 20 Hz. The DRIFT scenario also produced one false-positive window. These are controlled software regression results, not robust statistical estimates or accuracy claims for real vehicle faults. See the JSON report for source, split and limitations.
+
+## Public vehicle dataset validation
+
+The repository includes a bounded HDF converter and a profile for the public **Vehicle CAN bus data (with GPS)** dataset. The dataset is passenger-car CAN data sampled at 20 Hz, with signals including front-left wheel speed, steering angle, roll / pitch and accelerometer axes. It is licensed CC BY 4.0 according to the NIAID data catalogue; the original Zenodo record describes the channels and individual trip files. The raw files are deliberately **not bundled**. See [`docs/public_datasets.md`](docs/public_datasets.md) for attribution, caveats and an exact workflow. Release notes are in [`CHANGELOG.md`](CHANGELOG.md).
+
+The converter can export at most 20,000 rows and 40 numeric channels from an HDF file:
+
+```bash
+pip install -r requirements-public-data.txt
+python scripts/convert_vehicle_hdf.py --input external_data/one_trip.hdf --output external_data/vehicle_can.csv --max-rows 20000
 ```
 
-Known physical ranges are advisory checks for a small set of recognised channel names. They are not universal vehicle limits and do not alter the ML prediction.
+Inspect the printed column names and verify units before mapping them to `wheel_speed_fl_kph` and `longitudinal_accel_mps2`. Then use the Vehicle CAN profile and fit a trusted baseline from a separate clean portion / trip. Controlled fault injection can be evaluated with:
 
----
+```bash
+python scripts/evaluate_injected_faults.py \
+  --baseline external_data/clean_vehicle_baseline.csv \
+  --profile config/channel_profiles_vehicle_can_20hz.json \
+  --output reports/vehicle_can_injected_fault_metrics.json
+```
 
-## Low-end device and performance choices
+**Validation status:** this release includes the licensed-data adapter, profile and evaluation path, but the raw Zenodo file could not be downloaded in the build environment. Consequently, the report currently bundled with the project is synthetic-only; no public-dataset results are claimed yet. The selected dataset is real vehicle data, not Formula 1 telemetry, and does not contain labelled sensor faults. Fault-specific precision / recall still requires controlled injections or separately labelled fault records.
 
-- No GPU, deep-learning runtime, database, message broker or external API is required.
-- The Random Forest is small (64 trees, depth capped at 10) and trained in memory from deterministic synthetic data.
-- The trained model is cached per Streamlit process.
-- Inference is batched across all windows rather than called once per individual window.
-- Upload, row and column limits bound the memory footprint.
-- The UI plots no more than the first 2,000 samples of the selected channel.
+## Engineering constraints and edge cases
 
----
+- CSV input is bounded to 5 MB, 20,000 rows and 40 columns; API request bodies are bounded to 8 KiB.
+- A profile is JSON only, max 64 KiB, with version and channel relationship validation.
+- A baseline must be separate from the suspect recording and match profile ID + version.
+- Missing channels, too few samples, gear groups below minimum support and invalid timestamps skip the affected relationship rather than inventing a result.
+- A missing or mismatched correlation check never suppresses an ML alert.
+- Sensor drift is a review candidate; it is not a machine diagnosis.
+- Stream buffers are bounded and no uploaded data is persisted by the app code.
+- The public Streamlit host still receives uploaded data. Use only synthetic / approved public files in the public demo.
 
-## Security and privacy
+## CI / security checks
 
-- The CSV reader rejects oversized, malformed, non-UTF-8 and dimensionally excessive inputs.
-- Column selections are checked against the parsed dataframe; demo filenames are allow-listed.
-- Uploads are processed in memory and are not written to disk by this application.
-- The project never loads a user-supplied `pickle` or `joblib` model. The classifier is trained from source-controlled synthetic data at runtime.
-- No secrets, API keys, credentials or telemetry uploads are needed.
-- The hosted Streamlit service still receives the uploaded file for processing. **Do not upload confidential, personal, customer, or real team telemetry to the public demo.**
+GitHub Actions runs the unit and integration tests, Ruff, Bandit, dependency auditing, Gitleaks, and a C++ build/smoke test. Dependabot checks Python and GitHub Actions dependencies weekly. The local dev install includes the scanning tools:
 
-For a real engineering deployment, add authentication, role-based access, encrypted transport and storage, audit logs, approved data retention, schema/version governance, dependency scanning, monitoring and a reviewed threat model before accepting sensitive data.
+```bash
+ruff check app.py src tests scripts
+bandit -q -r src scripts app.py
+pip-audit -r requirements.txt
+pip-audit -r requirements-api.txt
+pytest -q
+```
 
-See [SECURITY.md](SECURITY.md) and [docs/engineering_decisions.md](docs/engineering_decisions.md).
+## Repository map
 
----
+```text
+.
+├── app.py                         # Streamlit dashboard
+├── src/tether/                    # ML, feature, baseline, stream, API modules
+├── config/                        # Versioned vehicle / channel profiles
+├── contracts/                     # Telemetry JSON Schema and model card
+├── cpp/                           # Optional C++17 residual kernel
+├── data/                           # Small synthetic examples only
+├── scripts/                       # Reproducibility, replay, conversion, evaluation
+├── reports/                       # Generated synthetic experiment report
+├── tests/                         # Python unit / integration tests
+└── docs/                           # Architecture, security, dataset and deployment notes
+```
 
-## Model evaluation
+## Limitations and intended use
 
-A reproducible 25% hold-out split from the synthetic generator (330 windows; 55 examples per class) currently reports:
-
-| Metric | Result |
-|---|---:|
-| **Accuracy** | **94.5%** |
-| Macro precision | 94.9% |
-| Macro recall | 94.5% |
-| **Macro F1** | **94.5%** |
-| Normal recall | 78.2% |
-
-The weaker `NORMAL` recall is intentionally visible rather than hidden. A conservative review state is preferable to claiming confidence where a signal pattern is ambiguous. These figures measure only the synthetic generator and must not be interpreted as real-world or F1-grade performance. See the reproducible script at `scripts/evaluate_model.py`.
-
----
-
-## Next engineering steps
-
-1. Add channel profiles and trusted baselines (units, sample rate, operating envelope and expected relationships).
-2. Add cross-sensor residual checks so drift can be distinguished from legitimate vehicle behaviour.
-3. Add timestamp-gap and packet-sequence diagnostics.
-4. Validate on appropriately licensed public motorsport/vehicle datasets and report per-fault precision/recall, false alerts per hour and detection delay.
-5. Add a versioned model/data contract, CI security scanning, monitoring and an authenticated ingestion API if the system moves beyond a prototype.
-
----
+TETHER is an educational research / portfolio prototype. It does not control a vehicle, diagnose mechanical failures, establish a vehicle's safe operating envelope, or replace calibration procedures and engineering review. Its current profiles and synthetic score thresholds must not be used for safety-critical decisions. Real-world use requires vehicle-specific sensor metadata, a representative trusted baseline, calibration, fault labels, deployment hardening, and validation by qualified engineers.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+The TETHER source code is MIT licensed. Third-party datasets retain their own licenses and are not included in this repository. See [`docs/public_datasets.md`](docs/public_datasets.md) for dataset attribution.

@@ -13,21 +13,6 @@ from tether.validation import validate_sensor_selection
 WINDOW_SIZE = 64
 MIN_WINDOW_SIZE = 32
 
-RESULT_COLUMNS = [
-    "sensor",
-    "window",
-    "start_row",
-    "end_row",
-    "fault_type",
-    "status",
-    "severity",
-    "model_score_pct",
-    "method",
-    "missing_pct",
-    "range_violations",
-    "recommended_check",
-]
-
 KNOWN_RANGES: dict[str, tuple[float, float, str]] = {
     "speed_kph": (0.0, 380.0, "km/h"),
     "throttle_pct": (0.0, 100.0, "%"),
@@ -165,14 +150,61 @@ def analyze_dataframe(
             record["severity"] = _severity(fault_type)
             record["recommended_check"] = FAULT_ACTIONS[fault_type]
 
-            # A univariate trend is not enough to prove sensor drift: speed,
-            # throttle and temperatures can legitimately change during a lap.
-            # Keep DRIFT as a human-review candidate pending reference evidence.
-            if fault_type == "DRIFT" or score < 0.55:
-                record["status"] = "REVIEW"
+            # Class scores are not calibrated probabilities and synthetic
+            # training cannot prove a vehicle fault. ML candidates remain
+            # review-only; only deterministic dropout / stuck rules escalate.
+            if fault_type == "NORMAL" and score >= 0.55:
+                record["status"] = "HEALTHY"
             else:
-                record["status"] = "HEALTHY" if fault_type == "NORMAL" else "ALERT"
+                record["status"] = "REVIEW"
 
     if not records:
         warnings.append("No windows could be analyzed. Each selected sensor needs at least 32 rows.")
-    return pd.DataFrame(records, columns=RESULT_COLUMNS), warnings
+    return pd.DataFrame(records), warnings
+
+
+def analyze_with_cross_sensor(
+    frame: pd.DataFrame,
+    sensor_columns: list[str],
+    model: Any,
+    profile: Any,
+    trusted_baseline: Any,
+) -> tuple[pd.DataFrame, pd.DataFrame, list[str]]:
+    """Run univariate ML plus cross-sensor checks and de-escalate corroborated false alarms.
+
+    A non-normal ML candidate can be de-escalated to HEALTHY only when a
+    configured cross-sensor relationship is healthy in the same window.
+    Missing or failed correlation evidence leaves it in REVIEW. ML scores
+    never create a hard ALERT; deterministic dropout / stuck rules do.
+    """
+    from tether.cross_sensor import analyze_cross_sensor
+
+    results, warnings = analyze_dataframe(frame, sensor_columns, model)
+    relationships = analyze_cross_sensor(frame, profile, trusted_baseline)
+    if results.empty or relationships.empty:
+        return results, relationships, warnings
+
+    healthy_by_start: dict[int, set[str]] = {}
+    for item in relationships[relationships["status"] == "HEALTHY"].itertuples(index=False):
+        channels = {part.strip() for part in str(item.channels).split("↔")}
+        healthy_by_start.setdefault(int(item.start_row), set()).update(channels)
+
+    for index, item in results.iterrows():
+        if item["method"] != "ML" or item["fault_type"] == "NORMAL":
+            continue
+        start_zero_based = int(item["start_row"]) - 1
+        if str(item["sensor"]) in healthy_by_start.get(start_zero_based, set()):
+            results.at[index, "status"] = "HEALTHY"
+            results.at[index, "correlation_guard"] = "DE-ESCALATED"
+            results.at[index, "recommended_check"] = (
+                "The configured cross-sensor relationship remains healthy; this ML-only candidate was de-escalated."
+            )
+        else:
+            results.at[index, "status"] = "REVIEW"
+            results.at[index, "correlation_guard"] = "NOT-CORROBORATED"
+
+    if "correlation_guard" not in results.columns:
+        results["correlation_guard"] = "NOT-APPLICABLE"
+    else:
+        results["correlation_guard"] = results["correlation_guard"].fillna("NOT-APPLICABLE")
+    return results, relationships, warnings

@@ -1,0 +1,78 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "generic-track-car-20hz",
+  "version": "1.0.0",
+  "sample_rate_hz": 20.0,
+  "timestamp_column": "time_s",
+  "sequence_column": "packet_seq",
+  "channels": {
+    "speed_kph": {
+      "unit": "km/h",
+      "minimum": 0,
+      "maximum": 380,
+      "sample_rate_hz": 20
+    },
+    "rpm": {
+      "unit": "rpm",
+      "minimum": 0,
+      "maximum": 20000,
+      "sample_rate_hz": 20
+    },
+    "gear": {
+      "unit": "gear",
+      "minimum": 1,
+      "maximum": 10,
+      "sample_rate_hz": 20
+    },
+    "longitudinal_accel_mps2": {
+      "unit": "m/s^2",
+      "minimum": -12,
+      "maximum": 12,
+      "sample_rate_hz": 20
+    },
+    "throttle_pct": {
+      "unit": "%",
+      "minimum": 0,
+      "maximum": 100,
+      "sample_rate_hz": 20
+    },
+    "brake_pct": {
+      "unit": "%",
+      "minimum": 0,
+      "maximum": 100,
+      "sample_rate_hz": 20
+    },
+    "coolant_temp_c": {
+      "unit": "degC",
+      "minimum": -20,
+      "maximum": 160,
+      "sample_rate_hz": 2
+    },
+    "oil_pressure_bar": {
+      "unit": "bar",
+      "minimum": 0,
+      "maximum": 20,
+      "sample_rate_hz": 20
+    }
+  },
+  "relationships": [
+    {
+      "name": "rpm_vs_speed_conditioned_on_gear",
+      "kind": "linear",
+      "x": "speed_kph",
+      "y": "rpm",
+      "condition_by": "gear",
+      "residual_z_threshold": 5.0,
+      "min_samples": 20
+    },
+    {
+      "name": "speed_derivative_vs_accelerometer",
+      "kind": "kinematic",
+      "x": "speed_kph",
+      "y": "longitudinal_accel_mps2",
+      "residual_z_threshold": 5.0,
+      "min_samples": 32,
+      "max_lag_samples": 2
+    }
+  ]
+}
