@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://tether.example/contracts/telemetry-1.0.0.schema.json",
+  "title": "TETHER telemetry packet",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["contract_version", "packet_seq", "timestamp_s", "values"],
+  "properties": {
+    "contract_version": {"const": "1.0.0"},
+    "packet_seq": {"type": "integer", "minimum": 0},
+    "timestamp_s": {"type": "number", "minimum": 0},
+    "values": {
+      "type": "object",
+      "minProperties": 1,
+      "maxProperties": 40,
+      "propertyNames": {"pattern": "^[A-Za-z][A-Za-z0-9_]{0,63}$"},
+      "additionalProperties": {"type": ["number", "null"]}
+    }
+  }
+}

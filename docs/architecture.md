@@ -1,25 +1,69 @@
 # Architecture
 
-## Runtime flow
+```text
+                 ┌──────────────────────────────────────────┐
+                 │  CSV Upload / Synthetic Demo / API Packet │
+                 └─────────────────────┬────────────────────┘
+                                       │
+                    bounded validation│contract checks
+                                       ▼
+                 ┌──────────────────────────────────────────┐
+                 │     Channel Profile + Operating Envelope │
+                 └─────────────────────┬────────────────────┘
+                                       │
+                      ┌────────────────┴───────────────┐
+                      ▼                                ▼
+          ┌────────────────────────┐       ┌─────────────────────────┐
+          │ Signal-local ML + Rules│       │ Trusted Baseline Checks │
+          │ RF / dropout / stuck   │       │ RPM↔speed, speed↔accel  │
+          └────────────┬───────────┘       └─────────────┬───────────┘
+                       └────────────────┬───────────────┘
+                                        ▼
+                         ┌────────────────────────────┐
+                         │ HEALTHY / REVIEW / ALERT   │
+                         │ human-in-the-loop findings │
+                         └────────────────────────────┘
+```
 
-1. **Input boundary:** a built-in synthetic CSV or user-selected CSV enters through the Streamlit UI.
-2. **Validation:** `validation.py` checks the byte limit, UTF-8 encoding, CSV shape, header uniqueness, row count and column count before constructing a dataframe.
-3. **Channel selection:** mostly-numeric fields are detected. Known time/index and discrete state channels are excluded from automatic selection.
-4. **Windowing:** each selected channel is split into 64-sample windows. A tail shorter than 32 samples is merged into its preceding window; a channel shorter than 32 samples is skipped with a warning.
-5. **Feature extraction:** `features.py` computes scale-aware features that tolerate missing and non-finite values.
-6. **Deterministic gate:** dropout and stuck-at signatures with strong evidence are handled by simple rules.
-7. **ML inference:** remaining windows are passed to one batched Random Forest call.
-8. **Triage:** definite rule or high-scoring ML findings become alerts; ambiguous predictions and all uncorroborated drift predictions remain review candidates.
-9. **Presentation:** Streamlit shows findings, quality notes, metrics and a bounded signal plot.
+## Components
 
-## Why rules + ML?
+- `validation.py`: defensive CSV parsing and column selection limits.
+- `features.py` / `model.py`: small, reproducible time-series feature extraction and Random Forest.
+- `profiles.py`: bounded JSON channel contract with units, sample rates, envelopes and relationship definitions.
+- `baseline.py`: robust baseline fitting; linear relationships can be conditioned on a discrete state such as gear. Kinematic fitting can select a small integer sample lag.
+- `cross_sensor.py`: per-window residual screening. It returns `HEALTHY` or `REVIEW`, not a mechanical diagnosis.
+- `analysis.py`: combines local ML findings and cross-sensor findings. A healthy configured cross-sensor relation may de-escalate a local ML `REVIEW` candidate to `HEALTHY`; deterministic dropout / stuck `ALERT` findings are not downgraded. Missing or mismatched evidence never suppresses a finding.
+- `streaming.py`: bounded one-packet-at-a-time processor; sequence and timestamp checks happen before a sample enters the window.
+- `api.py`: optional FastAPI adapter with bearer auth, a strict versioned JSON payload, channel allowlist, finite-value bounds, 8 KiB request limit and operational counters.
+- `native.py` + `cpp/`: optional C++17 residual kernel, exposed by a small C ABI and loaded with `ctypes`; NumPy remains the fallback.
+- `app.py`: Streamlit UI with profile selection, separate baseline upload, batch findings, cross-sensor diagnostics and packet replay.
 
-A model is not the right place to make every decision. A window with 30% missing samples has an obvious integrity issue and is best handled by a transparent rule. More ambiguous derivative/noise patterns benefit from the ML classifier. This reduces complexity and makes the highest-signal checks easier to test.
+## Data flow / contracts
 
-## Why drift is review-only
+`contracts/telemetry.schema.json` defines API packet `1.0.0`. `contracts/model-card.json` records model release `1.1.0`, the data and feature contract versions, training data provenance and prohibited use. Profile schema is currently `1.0.0`; profiles themselves carry an independent profile ID and version. A baseline is valid only for the exact same profile ID and version used for scoring.
 
-A single-channel trend cannot reliably tell the difference between sensor drift and legitimate changes in speed, throttle or temperature. TETHER therefore does not automatically escalate `DRIFT`. A production version should compare against a trusted baseline and correlated channels before promoting that candidate to an alert.
+## Bounded resource behaviour
 
-## Scaling path
+- Dashboard upload: 5 MB, 20,000 rows, 40 columns.
+- Profile JSON: 64 KiB.
+- API packet: 8 KiB and at most 40 channel values.
+- Stream processor: one fixed-size in-memory deque (default 64 packets) and bounded counters.
+- Metrics latency sample: most recent 512 API packet-processing durations.
+- C++ residual kernel: input length 2..1,000,000; Python adapter makes contiguous float64 arrays before crossing the C ABI.
+- Public HDF conversion: first 20,000 rows and at most 40 numeric channel arrays.
 
-The current process is intentionally bounded and synchronous. For larger data volumes, keep the same pure analysis functions and move ingestion/inference behind a separately authenticated API, then add queueing, streaming windows, model versioning, persistence policy and observability. Do not add distributed infrastructure until measurement shows the single-process design is insufficient.
+## Cross-sensor interpretation
+
+RPM is compared with road speed within a gear group, which avoids fitting one line across gear changes. The kinematic relationship computes a central-difference estimate of longitudinal acceleration from wheel / vehicle speed and compares it with the measured accelerometer after a small lag search. This is a diagnostic residual, not a complete vehicle-dynamics model: wheel slip, tire radius, grade, filtering, sign conventions and sensor mounting can all affect it.
+
+Throttle and speed are intentionally not linearly constrained. Their mapping depends on driver intent, gear state, brake use, traction and other dynamics. Add further relationships only where there is a physical model, a clear operating context and validated reference data.
+
+## Failure philosophy
+
+- Invalid contract / malformed packet: reject.
+- Duplicate, out-of-order sequence or non-increasing timestamp: reject and count.
+- Missing sequence or time interval: accept the current packet but report the discontinuity.
+- Insufficient profile samples or missing channel: skip that relationship.
+- High residual: `REVIEW`; do not infer mechanical root cause.
+- Missing baseline or version mismatch: disable cross-sensor de-escalation.
+- Missing native library: transparently fall back to NumPy.

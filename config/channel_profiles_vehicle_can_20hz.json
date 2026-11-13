@@ -1,0 +1,28 @@
+{
+  "schema_version": "1.0.0",
+  "profile_id": "vehicle-can-20hz",
+  "version": "1.0.0",
+  "sample_rate_hz": 20.0,
+  "timestamp_column": "time_s",
+  "sequence_column": "packet_seq",
+  "channels": {
+    "wheel_speed_fl_kph": {"unit": "km/h", "minimum": 0, "maximum": 300, "sample_rate_hz": 20},
+    "steering_angle_deg": {"unit": "deg", "minimum": -720, "maximum": 720, "sample_rate_hz": 20},
+    "yaw_rate_dps": {"unit": "deg/s", "minimum": -120, "maximum": 120, "sample_rate_hz": 20},
+    "longitudinal_accel_mps2": {"unit": "m/s^2", "minimum": -20, "maximum": 20, "sample_rate_hz": 20},
+    "lateral_accel_mps2": {"unit": "m/s^2", "minimum": -20, "maximum": 20, "sample_rate_hz": 20},
+    "roll_deg": {"unit": "deg", "minimum": -90, "maximum": 90, "sample_rate_hz": 20},
+    "pitch_deg": {"unit": "deg", "minimum": -90, "maximum": 90, "sample_rate_hz": 20}
+  },
+  "relationships": [
+    {
+      "name": "wheel_speed_derivative_vs_longitudinal_accel",
+      "kind": "kinematic",
+      "x": "wheel_speed_fl_kph",
+      "y": "longitudinal_accel_mps2",
+      "residual_z_threshold": 5.0,
+      "min_samples": 32,
+      "max_lag_samples": 2
+    }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "model_name": "tether-window-fault-classifier",
+  "model_version": "1.1.0",
+  "project_version": "1.1.0",
+  "feature_contract_version": "1.0.0",
+  "data_contract_version": "1.0.0",
+  "supported_profiles": [
+    {"profile_id": "generic-track-car-20hz", "profile_version": "1.0.0"},
+    {"profile_id": "vehicle-can-20hz", "profile_version": "1.0.0"}
+  ],
+  "training_data": "Deterministic synthetic signal generator; source-controlled; no private telemetry",
+  "algorithm": "RandomForestClassifier",
+  "runtime": "CPU, one worker, 64 estimators, max_depth=10",
+  "cross_sensor_methods": [
+    "robust gear-conditioned linear residuals",
+    "time-aligned speed derivative versus longitudinal acceleration"
+  ],
+  "native_acceleration": "Optional C++17 shared-library kernel with NumPy fallback",
+  "intended_use": "Educational triage of synthetic or approved non-sensitive telemetry",
+  "prohibited_use": "Safety-critical vehicle control, automatic mechanical diagnosis, or use without vehicle-specific validation",
+  "score_semantics": "Uncalibrated winning-class score; not a probability"
+}

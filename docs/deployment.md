@@ -50,7 +50,7 @@ Use the URL shown in the Streamlit app settings; availability and subdomain uniq
 ## 4. Verify the live demo
 
 - Select **Clean synthetic lap** and run analysis. It should show no escalated `ALERT` findings.
-- Select **Fault-injected synthetic lap** and run analysis. It should show `DROPOUT`, `STUCK`, `SPIKE` and `NOISE` alerts, plus trend candidates under review.
+- Select **Fault-injected synthetic lap** and run analysis. It should show deterministic `DROPOUT` and `STUCK` alerts; ML-only `SPIKE`, `NOISE` and `DRIFT` findings remain review candidates unless a configured cross-sensor relationship de-escalates them.
 - Upload only a small, non-sensitive UTF-8 CSV if you need to test the input path.
 
 ## 5. Add it to your portfolio

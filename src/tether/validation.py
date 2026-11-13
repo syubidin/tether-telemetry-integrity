@@ -13,7 +13,7 @@ MAX_ROWS = 20_000
 MAX_COLUMNS = 40
 TIME_OR_INDEX_COLUMNS = {
     "time", "time_s", "timestamp", "timestamp_s", "elapsed_s", "lap_time",
-    "lap_distance_m", "distance_m", "sample_id", "frame", "index", "row_id",
+    "lap_distance_m", "distance_m", "sample_id", "frame", "index", "row_id", "packet_seq",
     "gear", "drs", "pit_limiter", "flag", "state",
 }
 
