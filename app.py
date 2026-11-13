@@ -38,21 +38,87 @@ st.markdown(
     """
     <style>
       :root { color-scheme: dark; }
-      .stApp { background: radial-gradient(ellipse at 10% 0%, #15263a 0%, #0b111b 48%, #080d15 100%); }
-      html, body, [class*="css"] { font-family: 'Manrope', sans-serif; }
-      .block-container { padding-top: 2.0rem; max-width: 1440px; }
-      .eyebrow { font-family: 'DM Mono', monospace; color: #8da9c4; letter-spacing: .16em; font-size: .72rem; }
-      .hero-title { color: #f4f7fb; font-size: clamp(2.2rem, 5vw, 4.2rem); font-weight: 800; letter-spacing: -.06em; line-height: 1.02; margin: .45rem 0 .65rem; }
-      .hero-copy { color: #a9b8c8; max-width: 820px; font-size: 1.02rem; line-height: 1.7; }
-      .panel { border: 1px solid rgba(151,180,205,.18); background: rgba(14,25,38,.76); border-radius: 16px; padding: 1rem 1.15rem; }
-      .mono { font-family: 'DM Mono', monospace; }
-      div[data-testid="stMetric"] { background: rgba(16,30,45,.78); border: 1px solid rgba(151,180,205,.16); padding: 13px 16px; border-radius: 13px; }
-      div[data-testid="stMetricLabel"] { color: #a9b8c8; }
-      div[data-testid="stMetricValue"] { color: #f4f7fb; }
-      .stButton button, .stDownloadButton button { border-radius: 10px; font-weight: 700; }
-      section[data-testid="stSidebar"] { background: #0c1521; border-right: 1px solid rgba(151,180,205,.15); }
-      .small-note { font-size: .83rem; color: #91a3b6; line-height: 1.55; }
-      [data-testid="stDataFrame"] { border: 1px solid rgba(151,180,205,.15); border-radius: 12px; overflow: hidden; }
+      .stApp {
+        background: radial-gradient(ellipse at 10% 0%, #15263a 0%, #0b111b 48%, #080d15 100%);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      }
+      header[data-testid="stHeader"] {
+        background: transparent !important;
+      }
+      .block-container {
+        padding-top: 5.5rem !important;
+        padding-bottom: 3rem;
+        max-width: 1360px;
+      }
+      .eyebrow {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        color: #8da9c4;
+        letter-spacing: .14em;
+        font-size: .75rem;
+        font-weight: 600;
+        margin-bottom: 0.35rem;
+      }
+      .hero-title {
+        color: #f4f7fb;
+        font-size: clamp(2rem, 4.5vw, 3.4rem);
+        font-weight: 800;
+        letter-spacing: -0.02em;
+        line-height: 1.15;
+        margin: .25rem 0 .75rem;
+      }
+      .hero-copy {
+        color: #a9b8c8;
+        max-width: 820px;
+        font-size: 1.02rem;
+        line-height: 1.7;
+        margin-bottom: 1.5rem;
+      }
+      .panel {
+        border: 1px solid rgba(151,180,205,.18);
+        background: rgba(14,25,38,.76);
+        border-radius: 16px;
+        padding: 1rem 1.15rem;
+      }
+      .mono {
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      }
+      div[data-testid="stMetric"] {
+        background: rgba(16, 28, 44, 0.7);
+        border: 1px solid rgba(151, 180, 205, 0.16);
+        padding: 0.85rem 1.1rem;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      div[data-testid="stMetricLabel"] p {
+        font-size: 0.85rem !important;
+        color: #9ab0c4 !important;
+        margin-bottom: 0.2rem !important;
+      }
+      div[data-testid="stMetricValue"] {
+        color: #f4f7fb !important;
+        font-size: 1.5rem !important;
+        font-weight: 700 !important;
+        line-height: 1.25 !important;
+        word-break: break-word !important;
+      }
+      .stButton button, .stDownloadButton button {
+        border-radius: 8px;
+        font-weight: 600;
+      }
+      section[data-testid="stSidebar"] {
+        background: #0c1521;
+        border-right: 1px solid rgba(151,180,205,.15);
+      }
+      .small-note {
+        font-size: .83rem;
+        color: #91a3b6;
+        line-height: 1.55;
+      }
+      [data-testid="stDataFrame"] {
+        border: 1px solid rgba(151,180,205,.15);
+        border-radius: 10px;
+        overflow: hidden;
+      }
     </style>
     """,
     unsafe_allow_html=True,
@@ -186,14 +252,13 @@ if baseline_frame is not None:
     except (ValueError, TypeError) as exc:
         baseline_note = f"Trusted baseline could not be fitted: {exc}"
 
-left, right = st.columns([1.5, 1])
-with left:
-    st.markdown("**DATASET OVERVIEW**")
-    st.text(source_label)
-    st.caption("Original row order is preserved. No interpolation, sorting or upload persistence is performed.")
-with right:
-    st.metric("Rows × columns", f"{len(frame):,} × {len(frame.columns)}")
-    st.caption("Synthetic baseline is only appropriate for the bundled synthetic demo.")
+col_info1, col_info2 = st.columns(2)
+with col_info1:
+    st.metric("Dataset source", source_label)
+    st.caption("Original row order is preserved. No interpolation or sorting.")
+with col_info2:
+    st.metric("Dimensions", f"{len(frame):,} rows × {len(frame.columns)} cols")
+    st.caption("Time/index channels excluded from automated selection.")
 
 if source_mode == "Upload a CSV" and baseline is None:
     st.warning("A separate trusted baseline was not supplied. Single-channel ML still runs, but cross-sensor de-escalation is disabled.")
@@ -307,7 +372,7 @@ if results is not None:
             st.dataframe(envelope, width="stretch", hide_index=True)
 
         chart_sensor = st.selectbox("Inspect a channel", options=selected_sensors)
-        chart_data = pd.to_numeric(frame[chart_sensor], errors="coerce").iloc[:2000].reset_index(drop=True)
+        chart_data = pd.to_numeric(frame[chart_sensor], errors="coerce").iloc[:2000].to_frame(name=chart_sensor)
         st.line_chart(chart_data, height=250, width="stretch", alt=f"Time series of {chart_sensor}")
         st.caption("Plots are limited to 2,000 samples for responsiveness.")
 
