@@ -121,7 +121,7 @@ with st.sidebar:
     )
     st.divider()
     st.markdown(
-        "<div class='small-note'>Educational engineering prototype. Not affiliated with or endorsed by Mercedes-AMG PETRONAS F1 Team.</div>",
+        "<div class='small-note'>Educational engineering prototype.</div>",
         unsafe_allow_html=True,
     )
 
